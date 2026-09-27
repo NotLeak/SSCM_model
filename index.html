@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCLM 协议引擎 · 编译-执行分离</title>
+<style>
+  :root{
+    --blue:#2563eb;
+    --blue-deep:#1d4ed8;
+    --blue-ink:#1e40af;
+    --blue-bg:#eff6ff;
+    --blue-line:#bfdbfe;
+    --ink:#111827;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --bg-soft:#f9fafb;
+    --red:#dc2626;
+    --red-bg:#fef2f2;
+    --red-line:#fecaca;
+    --amber:#b45309;
+    --amber-bg:#fef3c7;
+    --amber-line:#fde68a;
+    --green:#047857;
+    --green-bg:#ecfdf5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:#ffffff;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    font-size:15px;line-height:1.65;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 64px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 0 0}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,var(--blue),var(--blue-deep));
+    color:#fff;font-weight:700;font-size:13px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .brand-name{font-weight:700;font-size:16px}
+  .brand-sub{font-size:12px;color:var(--muted);margin-top:1px}
+  .runtime-tag{
+    font-size:12px;color:var(--blue-ink);
+    background:var(--blue-bg);border:1px solid var(--blue-line);
+    border-radius:999px;padding:4px 12px;white-space:nowrap;
+  }
+
+  .hero{padding:40px 0 24px;text-align:center}
+  .hero h1{font-size:25px;font-weight:700}
+  .hero p{color:var(--muted);margin-top:8px;font-size:14px}
+
+  .card{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:22px 24px;box-shadow:0 1px 2px rgba(17,24,39,.04);
+  }
+  .card + .card{margin-top:16px}
+
+  label.field-label{display:block;font-size:13px;font-weight:600;margin-bottom:8px}
+  label.field-label .req{color:var(--blue)}
+  textarea{
+    width:100%;min-height:110px;resize:vertical;
+    border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;font:inherit;color:var(--ink);background:#fff;
+    outline:none;transition:border-color .15s, box-shadow .15s;
+  }
+  textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  textarea::placeholder{color:#9ca3af}
+
+  .actions{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .btn-primary{
+    background:linear-gradient(135deg,var(--blue),var(--blue-deep));
+    color:#fff;border:none;border-radius:10px;
+    padding:10px 22px;font-size:14px;font-weight:600;font-family:inherit;
+    cursor:pointer;transition:opacity .15s, transform .05s;
+  }
+  .btn-primary:hover{opacity:.92}
+  .btn-primary:active{transform:translateY(1px)}
+  .btn-primary:disabled{opacity:.55;cursor:wait}
+  .btn-ghost{
+    background:#fff;color:var(--blue-ink);
+    border:1px solid var(--blue-line);border-radius:10px;
+    padding:9px 18px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;
+  }
+  .btn-ghost:hover{background:var(--blue-bg)}
+  .action-hint{font-size:12px;color:var(--muted)}
+  .input-error{display:none;margin-top:10px;font-size:13px;color:var(--red)}
+  .input-error.show{display:block}
+
+  .mode-pill{font-size:12px;border-radius:999px;padding:4px 12px;border:1px solid var(--line);background:var(--bg-soft);color:var(--muted);white-space:nowrap}
+  .mode-pill.api{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-ink);font-weight:600}
+  .mode-pill .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#9ca3af;vertical-align:1px}
+  .mode-pill.api .dot{background:var(--blue)}
+
+  .chip{
+    font-size:12px;color:var(--blue-ink);background:var(--blue-bg);
+    border:1px solid var(--blue-line);border-radius:999px;padding:4px 12px;
+    cursor:pointer;font-family:inherit;transition:background .15s;
+  }
+  .chip:hover{background:#dbeafe;border-color:#93c5fd}
+  .chip.plain{background:var(--bg-soft);border-color:var(--line);color:var(--muted)}
+  .chip.plain:hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-ink)}
+
+  kbd{font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:var(--bg-soft)}
+
+  /* settings */
+  .settings{margin-top:14px;border:1px solid var(--blue-line);border-radius:10px;background:var(--blue-bg);padding:16px 18px}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .settings-grid label{font-size:12px;font-weight:600;color:var(--blue-ink);display:flex;flex-direction:column;gap:5px}
+  .settings-grid label.full{grid-column:1 / -1}
+  .settings-grid input{border:1px solid var(--blue-line);border-radius:8px;background:#fff;padding:8px 10px;font:inherit;font-size:13px;color:var(--ink);outline:none}
+  .settings-grid input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.10)}
+  .settings-actions{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .settings-msg{font-size:12.5px;color:var(--blue-ink)}
+  .settings-msg.err{color:var(--red)}
+  .settings-tip{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+  .settings-tip code{font-size:11px;background:rgba(0,0,0,.04);border-radius:4px;padding:1px 5px}
+
+  /* compile overlay */
+  #compile{margin-top:16px}
+  .compile-step,.api-step{display:none;align-items:center;gap:10px;font-size:13px;padding:7px 0}
+  .sim-steps .compile-step{display:flex;opacity:.35;transition:opacity .2s}
+  .sim-steps .compile-step.active,.sim-steps .compile-step.done{opacity:1}
+  .sim-steps .compile-step.done{color:var(--ink)}
+  .compile-step .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+  .compile-step.active .dot{border-color:var(--blue);animation:pulse 1s infinite}
+  .compile-step.done .dot{border-color:var(--blue);background:var(--blue)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.25)}50%{box-shadow:0 0 0 5px rgba(37,99,235,0)}}
+  .api-step.show{display:flex;color:var(--blue-ink)}
+  .api-step .spinner{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid var(--blue-line);border-top-color:var(--blue);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .api-step .elapsed{font-variant-numeric:tabular-nums;color:var(--muted)}
+
+  /* result head */
+  #result{margin-top:16px}
+  .result-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .badge{
+    display:inline-block;font-size:11px;font-weight:600;color:var(--blue-ink);
+    background:var(--blue-bg);border:1px solid var(--blue-line);
+    border-radius:6px;padding:2px 8px;
+  }
+  .badge.gray{color:var(--muted);background:var(--bg-soft);border-color:var(--line)}
+  .badge.amber{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-line)}
+  .badge.red{color:var(--red);background:var(--red-bg);border-color:var(--red-line)}
+  .badge.green{color:var(--green);background:var(--green-bg);border-color:#a7f3d0}
+  .result-title{font-size:19px;font-weight:700;margin:14px 0 2px}
+  .result-title .en{font-size:12px;color:var(--muted);font-weight:500;margin-left:8px}
+
+  .warn{margin-top:14px;font-size:13px;color:#92400e;background:var(--amber-bg);border:1px solid var(--amber-line);border-radius:8px;padding:10px 14px;line-height:1.6}
+  .warn.red{color:var(--red);background:var(--red-bg);border-color:var(--red-line)}
+  .warn code{font-size:12px;background:rgba(0,0,0,.04);border-radius:4px;padding:1px 5px}
+
+  /* layers */
+  .layer{margin-top:22px}
+  .layer-head{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;margin-bottom:10px}
+  .layer-head .no{
+    width:20px;height:20px;border-radius:6px;flex:none;
+    background:var(--blue);color:#fff;font-size:11.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .layer-head .sub{font-size:12px;color:var(--muted);font-weight:500}
+
+  .kv{border:1px solid var(--line);border-radius:10px;background:var(--bg-soft);padding:12px 16px;font-size:13px}
+  .kv + .kv{margin-top:8px}
+  .kv .k{font-size:12px;font-weight:700;color:var(--blue-ink);display:block;margin-bottom:3px}
+  .kv ul{margin:0;padding-left:18px}
+  .kv li{margin:2px 0;color:#374151}
+  .kv .none{color:var(--muted);font-size:12px}
+
+  /* dag cards */
+  .dag-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:680px){.dag-grid{grid-template-columns:1fr}}
+  .dag-card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff}
+  .dag-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .dag-head .dag-id{font-weight:700;font-size:13.5px}
+  .dag-head .pair{font-size:12px;color:var(--blue-ink);background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:5px;padding:1px 8px;font-family:ui-monospace,Consolas,monospace}
+  .dag-sec{font-size:11.5px;font-weight:700;color:var(--muted);margin:8px 0 3px;letter-spacing:.03em}
+  .mini-chips{display:flex;flex-wrap:wrap;gap:5px}
+  .mini-chip{font-size:11px;color:#374151;background:var(--bg-soft);border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+  .mini-chip.u{color:var(--amber);background:#fffbeb;border-color:#fde68a}
+  .edge-list{font-family:ui-monospace,Consolas,monospace;font-size:11.8px;color:#374151;line-height:1.8;background:var(--bg-soft);border:1px solid var(--line);border-radius:6px;padding:6px 10px;white-space:pre-wrap;word-break:break-all}
+  .dag-line{font-size:12px;color:var(--muted);margin-top:8px}
+  .dag-line b{color:var(--ink)}
+  .rt-chip{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:0 6px;vertical-align:1px}
+  .rt-chip.ok{color:var(--green);background:var(--green-bg);border:1px solid #a7f3d0}
+  .rt-chip.bad{color:var(--red);background:var(--red-bg);border:1px solid var(--red-line)}
+
+  .range-track{position:relative;height:8px;border-radius:999px;background:var(--blue-bg);overflow:hidden;flex:1;min-width:110px}
+  .range-fill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,var(--blue),var(--blue-deep));border-radius:999px}
+  .range-row{display:flex;align-items:center;gap:10px;margin-top:6px}
+  .range-row .num{font-size:12.5px;font-weight:700;color:var(--blue-deep);font-variant-numeric:tabular-nums;flex:none}
+
+  /* review / audit */
+  .rv-item,.risk-item{border:1px solid var(--line);border-radius:10px;padding:11px 14px;background:#fff;font-size:13px}
+  .rv-item + .rv-item,.risk-item + .risk-item{margin-top:8px}
+  .rv-item .rv-head{font-size:12px;font-weight:700;color:var(--blue-ink);margin-bottom:4px}
+  .risk-item{display:flex;gap:10px;align-items:flex-start}
+  .sev-chip{
+    flex:none;font-size:11px;font-weight:700;border-radius:5px;padding:1px 8px;margin-top:2px;
+  }
+  .sev-chip.lethal{color:#fff;background:var(--red)}
+  .sev-chip.major{color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-line)}
+  .sev-chip.minor{color:var(--muted);background:var(--bg-soft);border:1px solid var(--line)}
+  .risk-item .risk-body{min-width:0}
+  .risk-item .risk-affects{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .rt-paths{font-family:ui-monospace,Consolas,monospace;font-size:11.8px;background:var(--bg-soft);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-top:6px;line-height:1.9;word-break:break-all}
+
+  /* verdict */
+  .verdict{border:1px solid var(--blue-line);border-radius:10px;background:var(--blue-bg);padding:14px 16px}
+  .verdict .grade-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .grade-badge{
+    font-size:16px;font-weight:800;color:#fff;border-radius:8px;padding:4px 14px;letter-spacing:.05em;
+  }
+  .grade-badge.A{background:var(--blue)}
+  .grade-badge.B{background:#d97706}
+  .grade-badge.C{background:var(--red)}
+  .verdict .grade-reason{font-size:13px;color:#1e3a8a}
+  .verdict .basis{font-size:12px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--blue-line);padding-top:8px}
+  .tendency{font-size:13px;color:#374151;margin-top:10px}
+  .tendency b,.uncertain b{color:var(--ink)}
+  .uncertain{font-size:12.5px;color:var(--muted);margin-top:8px}
+
+  /* rounds */
+  .round-item{display:flex;gap:12px;font-size:13px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .round-item:last-child{border-bottom:none}
+  .round-item .r-no{
+    flex:none;width:44px;font-size:11px;font-weight:700;color:var(--blue-ink);
+    background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:6px;
+    text-align:center;padding:2px 0;height:fit-content;
+  }
+  .round-item .r-trigger{font-weight:600}
+  .round-item .r-note{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* classic format（观测推理版） */
+  .chip.fmt-on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .chip.fmt-on:hover{background:var(--blue);border-color:var(--blue)}
+  .meta-bar{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:5px 12px}
+  .meta-bar b{color:var(--ink)}
+  .meta-bar .arrow{color:var(--blue);font-weight:700}
+  .sec{margin-top:20px}
+  .sec-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:10px}
+  .sec-title::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--blue);flex:none}
+  .evidence{background:var(--blue-bg);border:1px solid var(--blue-line);border-left:3px solid var(--blue);border-radius:8px;padding:12px 16px;font-size:14px;color:#1e3a8a}
+  .evidence .ev-label{font-size:12px;color:var(--blue-ink);font-weight:700;display:block;margin-bottom:2px}
+  .prob-list{display:flex;flex-direction:column;gap:9px}
+  .prob-row{position:relative;overflow:hidden;background:linear-gradient(90deg,var(--blue) 0%,var(--blue-deep) 100%);color:#fff;border-radius:10px;padding:12px 16px;min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 1px 2px rgba(29,78,216,.18)}
+  .prob-fill{position:absolute;top:0;bottom:0;left:0;background:rgba(255,255,255,.13);pointer-events:none;transition:width .7s cubic-bezier(.22,.61,.36,1)}
+  .prob-row .p-label{position:relative;font-size:13.5px;font-weight:500;z-index:1;display:flex;gap:8px;align-items:baseline}
+  .prob-row .p-idx{font-size:11.5px;font-weight:700;color:#bfdbfe;flex:none;font-family:ui-monospace,Consolas,monospace}
+  .prob-row .p-texts{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .prob-row .p-note{font-size:11.5px;color:rgba(255,255,255,.72);line-height:1.45}
+  .prob-row .p-val{position:relative;z-index:1;flex:none;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .prob-note{margin-top:10px;font-size:12px;color:var(--muted)}
+  .prob-note code{font-family:ui-monospace,Consolas,monospace;font-size:11px;background:var(--bg-soft);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  .conf-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:12px 16px;background:#fff}
+  .conf-meter{flex:1;min-width:160px;height:8px;border-radius:999px;background:var(--blue-bg);overflow:hidden}
+  .conf-meter .cfill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--blue-deep));transition:width .7s ease}
+  .conf-num{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .conf-badge{font-size:11.5px;font-weight:700;color:#fff;border-radius:6px;padding:2px 10px;background:var(--blue)}
+  .conf-label{font-size:13px;color:var(--muted)}
+  .conf-reason{margin-top:8px;font-size:12px;color:var(--muted)}
+  .conf-reason b{color:var(--blue-ink)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .legend-item{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:#fff}
+  .legend-item b{color:var(--blue-ink);font-weight:700;margin-right:4px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+  .tree{background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;padding:16px 20px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;font-size:12.8px;line-height:1.75;color:#374151;white-space:pre}
+  .tree .t-hi{color:var(--blue-deep);font-weight:700}
+  .dc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){.dc-grid{grid-template-columns:1fr}}
+  .dc-box{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff}
+  .dc-box .dc-tag{display:inline-block;font-size:11px;font-weight:700;color:var(--blue-ink);background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:5px;padding:1px 7px;margin-bottom:8px;font-family:ui-monospace,Consolas,monospace}
+  .dc-box p{font-size:13px;color:#374151;margin-top:4px;line-height:1.7}
+  .dc-num{font-weight:700;color:var(--blue-deep);font-variant-numeric:tabular-nums}
+  .llm-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;padding:13px 16px;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer}
+  .llm-toggle:hover{background:var(--blue-bg)}
+  .llm-toggle .caret{color:var(--blue);font-size:12px}
+  .llm-body{display:none;border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;padding:16px 18px}
+  .llm-body.open{display:block}
+  .llm-item{display:flex;gap:12px;padding:10px 0}
+  .llm-item + .llm-item{border-top:1px dashed var(--line)}
+  .llm-item .llm-key{flex:none;width:64px;font-size:12.5px;font-weight:700;color:var(--blue-ink);padding-top:1px}
+  .llm-item p{font-size:13px;color:#374151}
+  .llm-item p b{color:var(--ink)}
+  .llm-foot{margin-top:12px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+
+  /* engine format（计算引擎版） */
+  .eng-ate{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:4px 0 2px}
+  .eng-ate .big{font-size:30px;font-weight:800;color:var(--blue-deep);font-variant-numeric:tabular-nums;letter-spacing:-0.01em}
+  .eng-ate .ci{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:12px}
+  .bar-row .bar-label{flex:none;width:104px;color:var(--muted)}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--bg-soft);border:1px solid var(--line);border-radius:999px;position:relative;overflow:hidden}
+  .bar-row .bar-core{position:absolute;top:1px;bottom:1px;border-radius:999px;min-width:2px}
+  .bar-row .bar-val{flex:none;width:118px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+  .ref-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .ref-chip{font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px;border:1px solid}
+  .ref-chip.pass{color:var(--green);background:var(--green-bg);border-color:#a7f3d0}
+  .ref-chip.fail{color:var(--red);background:var(--red-bg);border-color:var(--red-line)}
+  .arch-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+  .arch-table th,.arch-table td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-variant-numeric:tabular-nums}
+  .arch-table th{background:var(--bg-soft);color:var(--muted);font-weight:600}
+  .hist{margin-top:8px}
+  .hist-row{display:flex;align-items:flex-end;gap:2px;height:36px}
+  .hist-row .hbar{flex:1;background:var(--blue-line);border-radius:2px 2px 0 0;min-height:1px}
+  .hist-row.treated .hbar{background:var(--blue)}
+  .hist-label{font-size:10.5px;color:var(--muted);margin-top:3px;display:flex;justify-content:space-between}
+  .eng-sec{font-size:11.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;letter-spacing:.03em}
+  .eng-read{font-size:13px;color:#374151;background:var(--bg-soft);border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;line-height:1.7}
+  .eng-read b{color:var(--ink)}
+
+  .copy-row{display:flex;justify-content:flex-end;margin-top:18px}
+  .toast{
+    position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(8px);
+    background:var(--ink);color:#fff;font-size:13px;border-radius:8px;padding:9px 18px;
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;max-width:86vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  footer{text-align:center;color:#9ca3af;font-size:12px;padding:34px 0 0}
+  footer .sep{margin:0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">SC</div>
+      <div>
+        <div class="brand-name">SCLM 协议引擎</div>
+        <div class="brand-sub">Structural Causal Logic Model · 编译-执行分离</div>
+      </div>
+    </div>
+    <span class="runtime-tag">LLM = 编译器 · SCM 运行时 = 校验与定级</span>
+  </header>
+
+  <section class="hero">
+    <h1>多假设编译，运行时裁决</h1>
+    <p>输入事件 → LLM 编译 2-5 套候选 DAG → 结构运行时做环检测/后门枚举/d-分离/定级 → 修正回路兜底（最多 3 轮）</p>
+  </section>
+
+  <!-- 输入 -->
+  <section class="card">
+    <label class="field-label" for="obs-input">观测证据 / 事件描述 <span class="req">*</span></label>
+    <textarea id="obs-input" placeholder="输入要分析的事件。D 类（反事实）问题请一并写明事实基线：当时发生了什么、关键变量取了什么值。"></textarea>
+    <div class="actions">
+      <button class="btn-primary" id="run-btn">运行 SCLM 协议推演</button>
+      <span class="mode-pill" id="mode-pill"><span class="dot"></span>本地演示模式</span>
+      <span style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span class="action-hint">输出格式：</span>
+        <button class="chip fmt-on" data-format="engine">计算引擎版</button>
+        <button class="chip plain" data-format="classic">观测推理版</button>
+        <button class="chip plain" data-format="protocol">协议推演版</button>
+      </span>
+      <span class="action-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 快速运行</span>
+      <button class="chip plain" id="api-settings-btn" style="margin-left:auto">⚙ API 设置</button>
+    </div>
+    <div class="input-error" id="input-error">请先输入观测证据或事件描述，再运行推演。</div>
+
+    <div class="settings" id="settings" hidden>
+      <div class="actions" style="margin:0 0 12px">
+        <span class="action-hint">快捷选择平台：</span>
+        <button class="chip" data-preset="zhipu">智谱 GLM</button>
+        <button class="chip" data-preset="deepseek">DeepSeek</button>
+        <button class="chip" data-preset="moonshot">Kimi（月之暗面）</button>
+        <button class="chip" data-preset="openai">OpenAI</button>
+      </div>
+      <div class="settings-grid">
+        <label class="full">API Base URL（OpenAI 兼容接口）
+          <input id="s-base" placeholder="点上方「快捷选择平台」自动填入，或手动粘贴">
+        </label>
+        <label>模型 ID
+          <input id="s-model" placeholder="如 deepseek-chat / glm-4.6 / gpt-4o">
+        </label>
+        <label>API Key
+          <input id="s-key" type="password" placeholder="sk-…（仅存本机浏览器）">
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button class="btn-ghost" id="s-test">测试连接</button>
+        <button class="btn-primary" id="s-save" style="padding:8px 18px;font-size:13px">保存</button>
+        <span class="settings-msg" id="s-msg"></span>
+      </div>
+      <p class="settings-tip">
+        兼容 OpenAI <code>/chat/completions</code> 格式。Key 只存本浏览器，经本机 <code>server.js</code> 转发。⚠ 填平台控制台的<b>原始 API Key</b>（智谱形如 <code>xxxx.yyyy</code>），不要填临时生成的 token；Base URL 必须与 Key 同平台。填好后先点「测试连接」。
+        <span id="s-file-warn" style="color:#b45309"></span>
+      </p>
+    </div>
+  </section>
+
+  <!-- 运行过程 -->
+  <section class="card" id="compile" hidden>
+      <div class="api-step" id="api-step">
+        <span class="spinner"></span>
+        <span id="api-step-text">协议编排中 · <b id="api-model">-</b> —— 编译 → 运行时校验 → 审计回路（最多 3 轮）</span>
+        <span class="elapsed" id="api-elapsed">0.0s</span>
+      </div>
+      <div class="sim-steps" id="sim-steps-engine" hidden>
+        <div class="compile-step" data-step="0"><span class="dot"></span><span>编译器 —— LLM 构建定量 SCM（结构方程 + 系数 + 沙盘原型），禁止输出任何结果数值</span></div>
+        <div class="compile-step" data-step="1"><span class="dot"></span><span>计算器 —— 运行时后门识别 · do 干预蒙特卡洛 · 混杂偏差分解 · 反驳检验</span></div>
+        <div class="compile-step" data-step="2"><span class="dot"></span><span>沙盘 —— 多智能体原型推演（每臂 1500 智能体），输出分布与分组效应</span></div>
+      </div>
+    <div class="sim-steps" id="sim-steps" hidden>
+      <div class="compile-step" data-step="0"><span class="dot"></span><span>第 1 层 预处理 —— 判定问题类型 A/B/C/D，提取内生/外生变量与缺失信息</span></div>
+      <div class="compile-step" data-step="1"><span class="dot"></span><span>第 2-4 层 多假设编译 —— 生成候选 DAG · 因果检视 · 批判审计（本地模拟推演）</span></div>
+      <div class="compile-step" data-step="2"><span class="dot"></span><span>第 5 层 运行时渲染 —— 环检测 · 后门枚举 · d-分离 · 置信度定级</span></div>
+    </div>
+    <div class="sim-steps" id="sim-steps-classic">
+      <div class="compile-step" data-step="0"><span class="dot"></span><span>词法解析 —— 提取内生变量 V（现象/情绪/事件状态）与外生变量 U（环境噪音/隐含前提）</span></div>
+      <div class="compile-step" data-step="1"><span class="dot"></span><span>构建结构方程 —— 实例化三元组 M = ⟨U, V, F⟩，派生 do 算子与反事实查询</span></div>
+      <div class="compile-step" data-step="2"><span class="dot"></span><span>贝叶斯推断 —— 编译后验概率列表与置信度，渲染运行时输出</span></div>
+    </div>
+  </section>
+
+  <!-- 结果：计算引擎版 -->
+  <section class="card" id="result-engine" hidden>
+    <div class="result-head">
+      <span class="badge gray" id="e-src">内置演示模型</span>
+      <span class="badge amber" id="e-degrade" title="零号规则 · 降级协议">降级态：模拟数据，非实证</span>
+      <span class="badge" id="e-cross" hidden></span>
+    </div>
+
+    <h2 class="result-title">因果计算引擎报告<span class="en">编译器（LLM 构建定量 SCM）+ 计算器（蒙特卡洛 SCM）+ 沙盘（多智能体推演）</span></h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:4px">场景：<span id="e-context">—</span> · 所有数字均由确定性运行时计算，LLM 未参与任何数值估计</p>
+
+    <div class="warn" id="e-warn" hidden></div>
+    <div class="warn red" id="e-refusal" hidden></div>
+
+    <div class="layer">
+      <div class="layer-head"><span class="no">1</span>候选模型 · 因果效应计算<span class="sub">ATE 与置信区间来自 do 干预蒙特卡洛</span></div>
+      <div id="e-models"></div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-head"><span class="no">2</span>跨模型稳健性<span class="sub">候选结构间收敛 / 分歧</span></div>
+      <div class="kv"><span class="k">交叉比对</span><span id="e-cross-detail"></span></div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-head"><span class="no">3</span>结论可信度<span class="sub">运行时定级</span></div>
+      <div class="verdict">
+        <div class="grade-row">
+          <span class="grade-badge" id="e-grade">—</span>
+          <span style="font-size:12.5px;color:var(--muted)">结论可信度等级</span>
+        </div>
+        <p class="grade-reason" id="e-grade-reason" style="margin-top:8px"></p>
+        <p class="basis" id="e-grade-basis"></p>
+        <p class="tendency" id="e-overall"></p>
+        <p class="uncertain" id="e-uncertain"></p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-head"><span class="no">4</span>编译回路记录<span class="sub">LLM 编译 → 运行时校验</span></div>
+      <div class="kv" id="e-rounds"></div>
+    </div>
+
+    <div class="copy-row"><button class="btn-ghost copy-btn">复制文本版计算报告</button></div>
+  </section>
+
+  <!-- 结果：观测推理版（经典） -->
+  <section class="card" id="result-classic" hidden>
+    <div class="result-head">
+      <span class="meta-bar">🔍 搜索 <b id="c-kw">2</b> 个关键词，参考 <b id="c-ref">12</b> 篇资料 <span class="arrow">›</span></span>
+      <span class="badge gray" id="c-src">本地推演</span>
+      <span class="badge amber" id="c-degrade" title="零号规则 · 降级协议">降级态：模拟推演，非实证</span>
+    </div>
+
+    <h2 class="result-title">SCLM 输出（观测推理）<span class="en">Structural Causal Logic Model</span><span class="badge" id="c-domain">通用情境</span></h2>
+
+    <div class="warn" id="c-warn" hidden></div>
+
+    <div class="sec">
+      <div class="evidence"><span class="ev-label">观测证据</span><span id="c-ev"></span></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">后验概率推断</div>
+      <div class="prob-list" id="c-probs"></div>
+      <p class="prob-note" id="c-pnote"></p>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">置信度</div>
+      <div class="conf-row">
+        <span class="conf-label">综合置信度</span>
+        <div class="conf-meter"><div class="cfill" id="c-conf-fill" style="width:0%"></div></div>
+        <span class="conf-num" id="c-conf-num">—</span>
+        <span class="conf-badge" id="c-conf-badge">—</span>
+      </div>
+      <p class="conf-reason" id="c-conf-reason" hidden></p>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">因果结构解析 <span class="badge">M = ⟨U, V, F⟩</span></div>
+      <div class="tree" id="c-tree"></div>
+      <div class="legend">
+        <span class="legend-item"><b>U</b>外生变量 · 模型外部给定，不可直接观测</span>
+        <span class="legend-item"><b>V</b>内生变量 · 由模型内部机制决定</span>
+        <span class="legend-item"><b>F</b>结构函数 · 变量间的因果机制</span>
+        <span class="legend-item"><b>do(·)</b>干预算子 · 切断入边强制取值</span>
+        <span class="legend-item"><b>CF</b>反事实 · 「若当时…则…」</span>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">干预与反事实</div>
+      <div class="dc-grid">
+        <div class="dc-box"><span class="dc-tag">do 算子 · 干预推断</span><p id="c-do"></p></div>
+        <div class="dc-box"><span class="dc-tag">CF · 反事实推断</span><p id="c-cf"></p></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <button class="llm-toggle" id="c-llm-toggle" aria-expanded="false">
+        <span>▼ 触发 LLM 深度解释模块 —— 底层逻辑定义</span>
+        <span class="caret">▾</span>
+      </button>
+      <div class="llm-body" id="c-llm-body">
+        <div class="llm-item"><div class="llm-key">数学层</div><p id="c-math"></p></div>
+        <div class="llm-item"><div class="llm-key">计算层</div><p id="c-compute"></p></div>
+        <div class="llm-item"><div class="llm-key">认知论</div><p id="c-epis"></p></div>
+        <p class="llm-foot" id="c-foot"></p>
+      </div>
+    </div>
+
+    <div class="copy-row"><button class="btn-ghost copy-btn">复制文本版报告</button></div>
+  </section>
+
+  <!-- 结果：协议推演版 -->
+  <section class="card" id="result" hidden>
+    <div class="result-head">
+      <span class="badge gray" id="source-badge">本地演示</span>
+      <span class="badge amber" id="degrade-badge" title="零号规则 · 降级协议">降级态：结构化模拟运行时，无实证数据</span>
+      <span class="badge" id="type-badge" hidden></span>
+    </div>
+
+    <h2 class="result-title">SCLM 协议推演记录<span class="en">编译-执行分离 · 5 层闭环 + 修正回路</span></h2>
+
+    <div class="warn" id="warn" hidden></div>
+    <div class="warn red" id="refusal" hidden></div>
+
+    <!-- ① 预处理 -->
+    <div class="layer" id="layer1" hidden>
+      <div class="layer-head"><span class="no">1</span>问题预处理<span class="sub">只分类，不回答</span></div>
+      <div class="kv"><span class="k">问题类型</span><span id="p1-type"></span></div>
+      <div class="kv"><span class="k">内生变量 V（可观测）</span><ul id="p1-endo"></ul></div>
+      <div class="kv"><span class="k">外生变量 U（环境噪音 / 隐含前提）</span><ul id="p1-exo"></ul></div>
+      <div class="kv"><span class="k">缺失信息</span><ul id="p1-missing"></ul></div>
+      <div class="kv" id="p1-baseline-box" hidden><span class="k">事实基线（D 类 · 数据缺失协议）</span><ul id="p1-baseline"></ul></div>
+    </div>
+
+    <!-- ② 多假设 -->
+    <div class="layer" id="layer2" hidden>
+      <div class="layer-head"><span class="no">2</span>多假设编译<span class="sub">候选 DAG · 必须存在差异 · 禁止下结论</span></div>
+      <div class="dag-grid" id="dag-grid"></div>
+    </div>
+
+    <!-- ③ 检视 + 运行时后门 -->
+    <div class="layer" id="layer3" hidden>
+      <div class="layer-head"><span class="no">3</span>因果检视<span class="sub">编译器前提 · 运行时后门枚举（d-分离）</span></div>
+      <div id="review-list"></div>
+    </div>
+
+    <!-- ④ 审计 -->
+    <div class="layer" id="layer4" hidden>
+      <div class="layer-head"><span class="no">4</span>批判审计<span class="sub">只找漏洞 · 致死 / 重要 / 次要 强制分级</span></div>
+      <div id="audit-list"></div>
+    </div>
+
+    <!-- ⑤ 结果转述 -->
+    <div class="layer" id="layer5" hidden>
+      <div class="layer-head"><span class="no">5</span>结果转述<span class="sub">运行时定级 · 禁止修改数字与删减风险</span></div>
+      <div class="verdict">
+        <div class="grade-row">
+          <span class="grade-badge" id="grade-badge">—</span>
+          <span style="font-size:12.5px;color:var(--muted)">结论可信度等级</span>
+        </div>
+        <p class="grade-reason" id="grade-reason" style="margin-top:8px"></p>
+        <p class="basis" id="grade-basis"></p>
+        <p class="tendency" id="p5-tendency"></p>
+        <p class="uncertain" id="p5-uncertain"></p>
+      </div>
+      <div style="margin-top:12px">
+        <div class="layer-head" style="margin-bottom:8px"><span style="font-size:13px;font-weight:700">核心风险提示</span></div>
+        <div id="top-risks"></div>
+      </div>
+    </div>
+
+    <!-- ⑥ 修正回路 -->
+    <div class="layer" id="layer6" hidden>
+      <div class="layer-head"><span class="no">6</span>修正回路记录<span class="sub">绝不单次编译定稿</span></div>
+      <div class="kv" id="rounds-box"></div>
+    </div>
+
+    <div class="copy-row"><button class="btn-ghost copy-btn">复制文本版推演记录</button></div>
+  </section>
+
+  <footer>
+    SCLM · Causal Inference Protocol Engine<span class="sep">|</span>LLM 编译（1-4 层） · 结构运行时（校验/定级/修正回路）<span class="sep">|</span>零号规则：SCM 异常即降级声明
+  </footer>
+</div>
+
+<div class="toast" id="toast">已复制到剪贴板</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function el(tag, cls, html){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(html != null) e.innerHTML = html;
+    return e;
+  }
+
+  var TYPE_NAMES = { A:"A · 纯事实", B:"B · 观测关联", C:"C · 干预假设", D:"D · 反事实推理" };
+  var SEV_NAMES = { lethal:"致死", major:"重要", minor:"次要" };
+  var SEV_ORDER = { lethal:0, major:1, minor:2 };
+
+  /* ================= 本地演示记录（模拟推演，含运行时数据） ================= */
+
+  function simRecord(input){
+    var dags = [
+      {
+        dag_id:"1", exposure:"v1", outcome:"v4", robust:"中", prior_interval:[30,55],
+        variables:[
+          {id:"v1",label:"焦虑水平",note:"显性主诉"},
+          {id:"v2",label:"家庭反对强度",note:"环境压力"},
+          {id:"v3",label:"考研意愿",note:"决策节点"},
+          {id:"v4",label:"行动选择",note:"辞职备考/在职备考/放弃"}
+        ],
+        hidden:[
+          {id:"u1",label:"家庭风险偏好与话语权重"},
+          {id:"u2",label:"存款可承受月数"},
+          {id:"u3",label:"上岸基础与报录比"}
+        ],
+        edges:[["u1","v1"],["u1","v2"],["u2","v1"],["u2","v4"],["v2","v1"],["v1","v3"],["v3","v4"],["u3","v3"]],
+        assumptions:["焦虑主要由家庭反对与存款压力驱动","意愿只受焦虑单一中介影响"]
+      },
+      {
+        dag_id:"2", exposure:"v1", outcome:"v4", robust:"强", prior_interval:[38,62],
+        variables:[
+          {id:"v1",label:"焦虑水平",note:"显性主诉"},
+          {id:"v3",label:"考研意愿",note:"决策节点"},
+          {id:"v4",label:"行动选择",note:"结果节点"}
+        ],
+        hidden:[
+          {id:"u2",label:"存款可承受月数"},
+          {id:"u3",label:"上岸基础与报录比"}
+        ],
+        edges:[["u2","v1"],["u2","v3"],["u3","v1"],["u3","v3"],["v1","v3"],["v3","v4"]],
+        assumptions:["焦虑与意愿同为上游变量（经济/上岸确定性）的下游","意愿是行动的唯一直接因"]
+      }
+    ];
+    var runtime = {
+      dags:[
+        { dag_id:"1", backdoor_total:1, backdoor_open:1,
+          open_paths:[["v1","u2","v4"]], blocked_paths:[],
+          has_causal_path:true },
+        { dag_id:"2", backdoor_total:2, backdoor_open:0,
+          open_paths:[],
+          blocked_paths:[
+            { path:["v1","u2","v3","v4"], blockers:["v3"] },
+            { path:["v1","u3","v3","v4"], blockers:["v3"] }
+          ],
+          has_causal_path:true }
+      ],
+      findings:[
+        { severity:"major", risk:"运行时检出 DAG 1 有 1 条未阻断后门路径 v1 ← u2 → v4（编译器未列出），混杂未排除", affects:"DAG 1" }
+      ],
+      grade:{
+        grade:"B",
+        reason:"存在 1 条未阻断后门路径（共 3 条），混杂未完全排除",
+        basis:"量化依据：候选图 2 个；方向一致 2 个；后门未阻断 1/3 条；风险 致死 0 / 重要 1 / 次要 1",
+        counts:{ lethal:0, major:1, minor:1, openTotal:1, bdTotal:3, conv:2, n:2 }
+      }
+    };
+    return {
+      source:"sim", model:"",
+      refused:false, message:"",
+      degraded:true,
+      record:{
+        type:"B",
+        type_rationale:"只陈述了观察到的犹豫与焦虑，未提出干预或反事实",
+        endogenous:["焦虑水平","家庭反对强度","考研意愿","行动选择"],
+        exogenous:["家庭风险偏好与话语权重","存款可承受月数","上岸基础与报录比"],
+        missing:["存款具体金额与可持续月数","目标院校专业报录比","家庭沟通的实际话语权重"],
+        baseline:null,
+        dags:dags,
+        review:[
+          { dag_id:"1", premises:["焦虑沿「反对→焦虑→意愿」单向传导","存款只通过焦虑起作用"],
+            failure_conditions:["若存款同时直接改变行动选项（在职备考成本），本图失效"] },
+          { dag_id:"2", premises:["焦虑与意愿无直接因果，仅为共同上游的下游","意愿是行动唯一直接因"],
+            failure_conditions:["若焦虑本身独立压低行动力（失眠/低效），本图失效"] }
+        ],
+        audit:[
+          { severity:"major", risk:"运行时检出 DAG 1 有 1 条未阻断后门路径 v1 ← u2 → v4（编译器未列出），混杂未排除", affects:"DAG 1" },
+          { severity:"minor", risk:"「焦虑驱动意愿」与「意愿被家庭叙事塑造」两种方向在候选间未收敛", affects:"DAG 1 / DAG 2 之间" }
+        ],
+        tendency:"直觉把「焦虑」当决策主因，但结构上家庭叙事与存款约束可能才是上游——倾向先补齐缺失信息再谈决策。",
+        uncertainty:"以上为结构化假设推演，无实证数据拟合，不构成对个人处境的因果结论。",
+        revision_note:""
+      },
+      runtime:runtime,
+      rounds:[{ round:1, trigger:"首次编译通过运行时校验", note:runtime.grade.basis }],
+      warn:null
+    };
+  }
+
+  /* ================= 渲染 ================= */
+
+  var lastText = null;
+
+  function labelMap(dag){
+    var m = {};
+    (dag.variables || []).forEach(v => { if(v && v.id) m[v.id] = v.label || v.id; });
+    (dag.hidden || []).forEach(v => { if(v && v.id) m[v.id] = v.label || v.id; });
+    return m;
+  }
+  function pathText(path, labels){
+    if(!path || !path.length) return "";
+    var parts = [];
+    for(var i = 0; i < path.length; i++){
+      if(i > 0){
+        /* 箭头方向未知（运行时只给节点序列），用无向虚线表达 */
+        parts.push("–");
+      }
+      parts.push(labels[path[i]] || path[i]);
+    }
+    return parts.join(" ");
+  }
+  function fillList(ulId, items, noneText){
+    var ul = $(ulId);
+    ul.innerHTML = "";
+    if(!items || !items.length){
+      ul.appendChild(el("li", "none", esc(noneText || "（未提供）")));
+      return;
+    }
+    items.forEach(function(t){ ul.appendChild(el("li", "", esc(t))); });
+  }
+
+  function render(r){
+    $("source-badge").textContent = r.source === "api" ? ("LLM 编译 · " + (r.model || "API")) : "本地演示（模拟推演）";
+    $("degrade-badge").hidden = !r.degraded;
+
+    var rec = r.record;
+
+    /* 协议性拒绝 */
+    if(r.refused){
+      $("refusal").hidden = false;
+      $("refusal").innerHTML = "<b>⛔ 协议性拒绝（Final Rule）：</b>" + esc(r.message) + "<br>系统宁可输出「无法判定」终止，也不进行看似合理的幻觉补全。";
+      ["layer1","layer2","layer3","layer4","layer5","layer6"].forEach(id => $(id).hidden = true);
+      $("type-badge").hidden = true;
+      $("result").hidden = false;
+      lastText = null;
+      return;
+    }
+    $("refusal").hidden = true;
+
+    $("type-badge").hidden = false;
+    $("type-badge").textContent = TYPE_NAMES[rec.type] || rec.type;
+    $("warn").hidden = !r.warn;
+    if(r.warn) $("warn").innerHTML = r.warn;
+
+    /* ① 预处理 */
+    $("layer1").hidden = false;
+    $("p1-type").innerHTML = "<b>" + esc(TYPE_NAMES[rec.type] || rec.type) + "</b>" + (rec.type_rationale ? " —— " + esc(rec.type_rationale) : "");
+    fillList("p1-endo", rec.endogenous);
+    fillList("p1-exo", rec.exogenous);
+    fillList("p1-missing", rec.missing);
+    var hasBL = rec.type === "D" && rec.baseline;
+    $("p1-baseline-box").hidden = !hasBL;
+    if(hasBL){
+      var bl = [];
+      (rec.baseline.facts || []).forEach(f => bl.push(f));
+      (rec.baseline.values || []).forEach(v => bl.push(v.var + " = " + v.value));
+      fillList("p1-baseline", bl);
+    }
+
+    /* ② 多假设 DAG */
+    $("layer2").hidden = false;
+    var grid = $("dag-grid");
+    grid.innerHTML = "";
+    rec.dags.forEach(function(dag){
+      var labels = labelMap(dag);
+      var rt = (r.runtime && r.runtime.dags.find(x => x.dag_id === dag.dag_id)) || null;
+      var card = el("div", "dag-card");
+
+      var head = el("div", "dag-head");
+      head.appendChild(el("span", "dag-id", "DAG " + esc(dag.dag_id)));
+      head.appendChild(el("span", "pair", esc((labels[dag.exposure] || dag.exposure) + " → " + (labels[dag.outcome] || dag.outcome))));
+      head.appendChild(el("span", "badge " + (dag.robust && dag.robust.indexOf("强") === 0 ? "green" : dag.robust && dag.robust.indexOf("弱") === 0 ? "red" : "amber"), "自评稳健：" + esc(dag.robust || "—")));
+      card.appendChild(head);
+
+      card.appendChild(el("div", "dag-sec", "可观测变量 V"));
+      var vc = el("div", "mini-chips");
+      (dag.variables || []).forEach(v => vc.appendChild(el("span", "mini-chip", "<b>" + esc(v.id) + "</b> " + esc(v.label) + (v.note ? " · " + esc(v.note) : ""))));
+      card.appendChild(vc);
+
+      card.appendChild(el("div", "dag-sec", "隐藏混杂 U"));
+      var hc = el("div", "mini-chips");
+      if(dag.hidden && dag.hidden.length){
+        dag.hidden.forEach(v => hc.appendChild(el("span", "mini-chip u", "<b>" + esc(v.id) + "</b> " + esc(v.label))));
+      } else {
+        hc.appendChild(el("span", "mini-chip", "（无）"));
+      }
+      card.appendChild(hc);
+
+      card.appendChild(el("div", "dag-sec", "有向边"));
+      var edgeText = (dag.edges || []).map(e => (labels[e[0]] || e[0]) + " → " + (labels[e[1]] || e[1])).join("\n");
+      card.appendChild(el("div", "edge-list", esc(edgeText)));
+
+      if(dag.assumptions && dag.assumptions.length){
+        card.appendChild(el("div", "dag-sec", "建模假设"));
+        var al = el("ul");
+        al.style.cssText = "margin:0;padding-left:18px;font-size:12px;color:#374151";
+        dag.assumptions.forEach(a => al.appendChild(el("li", "", esc(a))));
+        card.appendChild(al);
+      }
+
+      /* 先验区间（假设推演） */
+      if(dag.prior_interval){
+        card.appendChild(el("div", "dag-sec", "核心效应先验区间（假设推演 · 非实证）"));
+        var row = el("div", "range-row");
+        var track = el("div", "range-track");
+        var fill = el("div", "range-fill");
+        fill.style.left = dag.prior_interval[0] + "%";
+        fill.style.width = (dag.prior_interval[1] - dag.prior_interval[0]) + "%";
+        track.appendChild(fill);
+        row.appendChild(track);
+        row.appendChild(el("span", "num", "[" + dag.prior_interval[0] + "%, " + dag.prior_interval[1] + "%]"));
+        card.appendChild(row);
+      }
+
+      if(rt){
+        var line = el("div", "dag-line");
+        line.innerHTML = "运行时：后门路径 <b>" + rt.backdoor_open + "/" + rt.backdoor_total + "</b> 条未阻断" +
+          (rt.has_causal_path ? " · 存在 exposure→outcome 有向路径 <span class='rt-chip ok'>方向成立</span>" : " · 无有向因果路径 <span class='rt-chip bad'>方向不成立</span>");
+        card.appendChild(line);
+      }
+      grid.appendChild(card);
+    });
+
+    /* ③ 因果检视 */
+    $("layer3").hidden = false;
+    var rv = $("review-list");
+    rv.innerHTML = "";
+    rec.dags.forEach(function(dag){
+      var labels = labelMap(dag);
+      var rvd = (rec.review || []).find(x => x.dag_id === dag.dag_id) || {};
+      var box = el("div", "rv-item");
+      box.appendChild(el("div", "rv-head", "DAG " + esc(dag.dag_id) + " 前置假设 / 失效条件"));
+      var ul = el("ul");
+      ul.style.cssText = "margin:0;padding-left:18px";
+      (rvd.premises || []).forEach(p => ul.appendChild(el("li", "", "前提：" + esc(p))));
+      (rvd.failure_conditions || []).forEach(p => ul.appendChild(el("li", "", "失效条件：" + esc(p))));
+      box.appendChild(ul);
+
+      var rt = r.runtime && r.runtime.dags.find(x => x.dag_id === dag.dag_id);
+      if(rt){
+        var paths = el("div", "rt-paths");
+        var lines = [];
+        rt.open_paths.forEach(p => lines.push("<span class='rt-chip bad'>开放</span> " + esc(pathText(p, labels))));
+        rt.blocked_paths.forEach(bp => lines.push("<span class='rt-chip ok'>阻断</span> " + esc(pathText(bp.path, labels)) + (bp.blockers.length ? "（被 " + esc(bp.blockers.join("、")) + " 阻断）" : "")));
+        paths.innerHTML = lines.length ? lines.join("<br>") : "（无后门路径）";
+        box.appendChild(paths);
+      }
+      rv.appendChild(box);
+    });
+
+    /* ④ 批判审计 */
+    $("layer4").hidden = false;
+    var au = $("audit-list");
+    au.innerHTML = "";
+    var audits = [...(rec.audit || [])].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+    if(!audits.length){
+      au.appendChild(el("div", "risk-item", "<span class='sev-chip minor'>—</span><div class='risk-body'>审计未发现风险（少见，运行时仍保留降级态标注）</div>"));
+    }
+    audits.forEach(a => {
+      var item = el("div", "risk-item");
+      item.appendChild(el("span", "sev-chip " + a.severity, SEV_NAMES[a.severity] || a.severity));
+      var body = el("div", "risk-body");
+      body.appendChild(el("div", "", esc(a.risk)));
+      if(a.affects) body.appendChild(el("div", "risk-affects", "影响范围：" + esc(a.affects)));
+      item.appendChild(body);
+      au.appendChild(item);
+    });
+
+    /* ⑤ 结果转述 */
+    $("layer5").hidden = false;
+    var g = r.runtime.grade;
+    var gb = $("grade-badge");
+    gb.textContent = g.grade;
+    gb.className = "grade-badge " + g.grade;
+    $("grade-reason").textContent = g.reason;
+    $("grade-basis").textContent = g.basis;
+    $("p5-tendency").innerHTML = "<b>多假设倾向（不构成结论）：</b>" + esc(rec.tendency || "—");
+    $("p5-uncertain").innerHTML = "<b>不确定性声明：</b>" + esc(rec.uncertainty || "—");
+    var top = $("top-risks");
+    top.innerHTML = "";
+    audits.filter(a => a.severity !== "minor").slice(0, 3).forEach(a => {
+      var item = el("div", "risk-item");
+      item.appendChild(el("span", "sev-chip " + a.severity, SEV_NAMES[a.severity]));
+      item.appendChild(el("div", "risk-body", esc(a.risk)));
+      top.appendChild(item);
+    });
+    if(!top.children.length){
+      top.appendChild(el("div", "risk-item", "<span class='sev-chip minor'>—</span><div class='risk-body'>无致死/重要级风险残留</div>"));
+    }
+
+    /* ⑥ 修正回路 */
+    $("layer6").hidden = false;
+    var rb = $("rounds-box");
+    rb.innerHTML = "";
+    (r.rounds || []).forEach(rd => {
+      var item = el("div", "round-item");
+      item.appendChild(el("span", "r-no", "第 " + rd.round + " 轮"));
+      var body = el("div", "");
+      body.appendChild(el("div", "r-trigger", esc(rd.trigger)));
+      body.appendChild(el("div", "r-note", esc(rd.note || "")));
+      item.appendChild(body);
+      rb.appendChild(item);
+    });
+
+    $("result").hidden = false;
+    lastText = plainText(r);
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ================= 文本版 ================= */
+
+  function plainText(r){
+    var L = [], rec = r.record;
+    L.push("## SCLM 协议推演记录（编译-执行分离）");
+    L.push("[降级态：结构化模拟运行时，无实证数据拟合；全部结论标注为非因果假设]");
+    L.push("");
+    L.push("① 问题预处理");
+    L.push("- 类型：" + rec.type + (rec.type_rationale ? "（" + rec.type_rationale + "）" : ""));
+    L.push("- 内生变量 V：" + rec.endogenous.join("、"));
+    L.push("- 外生变量 U：" + rec.exogenous.join("、"));
+    L.push("- 缺失信息：" + (rec.missing || []).join("、"));
+    if(rec.type === "D" && rec.baseline){
+      L.push("- 事实基线：" + [].concat(rec.baseline.facts || []).concat((rec.baseline.values || []).map(v => v.var + "=" + v.value)).join("；"));
+    }
+    L.push("");
+    L.push("② 多假设编译（候选 DAG）");
+    rec.dags.forEach(d => {
+      var labels = labelMap(d);
+      L.push("DAG " + d.dag_id + "：" + (labels[d.exposure] || d.exposure) + " → " + (labels[d.outcome] || d.outcome) +
+        " | 自评稳健 " + d.robust + " | 先验区间 [" + d.prior_interval[0] + "%, " + d.prior_interval[1] + "%]");
+      L.push("  边：" + d.edges.map(e => (labels[e[0]] || e[0]) + "→" + (labels[e[1]] || e[1])).join("；"));
+      L.push("  隐藏：" + (d.hidden || []).map(h => h.label).join("、"));
+    });
+    L.push("");
+    L.push("③ 因果检视");
+    (rec.review || []).forEach(rv => {
+      L.push("DAG " + rv.dag_id + " 前提：" + (rv.premises || []).join("；"));
+      L.push("DAG " + rv.dag_id + " 失效条件：" + (rv.failure_conditions || []).join("；"));
+    });
+    L.push("");
+    L.push("④ 批判审计");
+    (rec.audit || []).forEach(a => L.push("- [" + (SEV_NAMES[a.severity] || a.severity) + "] " + a.risk + (a.affects ? "（" + a.affects + "）" : "")));
+    L.push("");
+    L.push("⑤ 结果转述");
+    L.push("- 结论可信度等级：" + r.runtime.grade.grade + "（" + r.runtime.grade.reason + "）");
+    L.push("- " + r.runtime.grade.basis);
+    L.push("- 多假设倾向：" + rec.tendency);
+    L.push("- 不确定性声明：" + rec.uncertainty);
+    L.push("");
+    L.push("⑥ 修正回路记录");
+    (r.rounds || []).forEach(rd => L.push("- 第 " + rd.round + " 轮：" + rd.trigger + (rd.note ? "（" + rd.note + "）" : "")));
+    return L.join("\n");
+  }
+
+  /* ================= 输出格式切换 ================= */
+
+  var FMT_LS = "sclm_format2";
+  function getFormat(){
+    try{
+      var v = localStorage.getItem(FMT_LS);
+      return (v === "protocol" || v === "classic") ? v : "engine";
+    }
+    catch(e){ return "engine"; }
+  }
+  function setFormat(f){
+    try{ localStorage.setItem(FMT_LS, f); }catch(e){}
+    applyFormatUI();
+  }
+  function applyFormatUI(){
+    var fmt = getFormat();
+    Array.prototype.forEach.call(document.querySelectorAll(".chip[data-format]"), function(chip){
+      var on = chip.getAttribute("data-format") === fmt;
+      chip.className = "chip" + (on ? " fmt-on" : " plain");
+    });
+    $("run-btn").textContent = fmt === "classic" ? "生成 SCLM 推理报告" : fmt === "protocol" ? "运行 SCLM 协议推演" : "运行因果计算引擎";
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".chip[data-format]"), function(chip){
+    chip.addEventListener("click", function(){ setFormat(chip.getAttribute("data-format")); });
+  });
+
+  /* ================= 经典格式：领域模板与模拟推演 ================= */
+
+  var DEFAULT_LAYERS = {
+    math: "SCM 三元组 M = ⟨U, V, F⟩。U 为外生变量（噪声与前提），V 为内生变量（可观测事件），F 为结构函数（因果机制）。概率不再来自语料共现，而是沿结构方程逐层传播。",
+    compute: "LLM 角色为编译器，SCM 为运行时。LLM 把自然语言编译为结构方程与因果查询（后验 / do 干预 / 反事实），数值推断交由 SCM 运行时执行——语言生成与逻辑推断解耦。",
+    epis: "知识在于干预不变性，而非文本相似性。一个结论「成立」，当且仅当它在干预与反事实的扰动下保持稳定；与提问措辞是否相似无关。"
+  };
+
+  var DOMAINS = {
+    stock: {
+      badge: "交易情境",
+      keywords: ["主板","涨停","连板","炸板","回封","封单","打板","龙头","卡位","分歧","转强","承接","洗盘","断板","高度","情绪周期","20cm","创业板","科创板","涨停板","弱转强","低吸","排板","晋级","空间板","复盘","竞价","票","持股","溢价","板块"],
+      probs: [
+        { label: "表面条件概率 P(有效 | 观测到的封板/回封信号)", range: [62, 76] },
+        { label: "排除 20cm 创业板/科创板干扰后的概率", range: [48, 64] },
+        { label: "真实承接 · 机制有效性概率", range: [34, 52] },
+        { label: "交易所官方定义「有效涨停」的概率", range: [52, 70] }
+      ],
+      u: ["u₁ 市场情绪周期（冰点 / 发酵 / 高潮 / 退潮）","u₂ 板块资金轮动节奏（主线 or 卡位）","u₃ 未观测的潜伏盘规模与成本"],
+      v: ["v₁ 封板信号（涨停时间 · 封单量 · 炸板次数）","v₂ 板块分歧度（跟风断板 / 晋级率）","v₃ 持有决策（继续持有 or 离场）","v₄ 次日溢价（结果变量）"],
+      f: ["v₁ ← f₁(u₁, u₃)","v₂ ← f₂(u₂)","v₃ ← f₃(v₁, v₂, u₁)   ← 决策节点","v₄ ← f₄(v₃, u₁, u₂)   ← 结果节点"],
+      doTxt: function(d){ return "P(次日溢价 > 0 | do(继续持有)) = " + d.a + "%，对比 do(竞价离场) = " + d.b + "% —— 干预收益 +" + (d.a - d.b) + "pp。do 算子切断了 v₃ 对盘面情绪的依赖，只保留「持有 → 次日开盘」这条因果路径。"; },
+      cfTxt: function(d){ return "反事实：若昨日板块未分歧（u₂ 轮动未结束），则 v₂ 分歧度回落，P(晋级) 由 " + d.base + "% 升至 " + d.e + "% —— 你观测到的「走弱」，有 " + d.cfShare + "% 来自环境，而非个股本身。"; }
+    },
+    romance: {
+      badge: "生活情境",
+      keywords: ["喜欢","暗恋","搭讪","表白","女孩","女孩子","男生","男朋友","女朋友","心动","约会","相亲","容貌焦虑","追求","暧昧","恋爱","单身","crush","社恐","心仪","女神","处对象","联系方式","微信"],
+      probs: [
+        { label: "表面条件概率 P(她有男朋友 | 观测到的疏远信号)", range: [55, 72] },
+        { label: "排除容貌焦虑等自我投射干扰后的概率", range: [36, 54] },
+        { label: "主动搭讪 · 行动机制有效性概率", range: [30, 48] },
+        { label: "关系因果链「有效回应」的概率", range: [42, 60] }
+      ],
+      u: ["u₁ 她的真实关系状态（是否单身 · 不可直接观测）","u₂ 你的自我评价基线（容貌焦虑水平）","u₃ 社交场域氛围（共同场合 · 熟人网络 · 时机）"],
+      v: ["v₁ 观察到的行为信号（回复冷淡 / 回避）","v₂ 自我效能感（「我不配」的信念强度）","v₃ 发起搭讪决策（行动节点）","v₄ 关系推进结果（有效回应与否）"],
+      f: ["v₁ ← f₁(u₁, u₃)","v₂ ← f₂(u₂)","v₃ ← f₃(v₁, v₂, u₃)   ← 决策节点","v₄ ← f₄(v₃, u₁, u₃)   ← 结果节点"],
+      doTxt: function(d){ return "P(有效回应 | do(主动搭讪)) = " + d.a + "%，对比观测基线 P(有效回应 | 观测不行动) = " + d.b + "% —— 不行动时结果恒为 0，干预是唯一能产生证据的操作。"; },
+      cfTxt: function(d){ return "反事实：若 u₂ 容貌焦虑 = 低（假设其余不变），则 v₃ 发起概率升至 " + d.c + "%，P(有效回应) 升至 " + d.e + "% —— 拦住你的有 " + d.cfShare + "% 是自我投射，而非她的真实状态。"; }
+    },
+    generic: {
+      badge: "通用情境",
+      keywords: [],
+      probs: [
+        { label: "表面条件概率 P(结论成立 | 观测证据)", range: [58, 74] },
+        { label: "排除混淆变量（混杂因子）后的概率", range: [40, 58] },
+        { label: "因果机制有效性概率", range: [32, 50] },
+        { label: "多情境稳健成立（干预不变性）的概率", range: [44, 62] }
+      ],
+      u: ["u₁ 环境背景噪声（不可控外部条件）","u₂ 未观测的前提假设（隐含默认）","u₃ 随机扰动项 ε"],
+      v: ["v₁ 观测信号（你看到/听到的现象）","v₂ 中介判断（你对信号的解读）","v₃ 行动决策（可干预节点）","v₄ 结果变量（关心的结局）"],
+      f: ["v₁ ← f₁(u₁, u₃)","v₂ ← f₂(v₁, u₂)","v₃ ← f₃(v₂, u₁)   ← 决策节点","v₄ ← f₄(v₃, u₂)   ← 结果节点"],
+      doTxt: function(d){ return "P(结果改善 | do(改变可控行动)) = " + d.a + "%，对比维持现状基线 = " + d.b + "% —— 干预收益 +" + (d.a - d.b) + "pp，且该结论对措辞变化保持稳定（干预不变性）。"; },
+      cfTxt: function(d){ return "反事实：若关键前提 u₂ 为真（其余不变），则结论概率升至 " + d.e + "%；当前观测与该反事实的差距中，约 " + d.cfShare + "% 来自未观测前提，而非行动本身。"; }
+    }
+  };
+
+  function hashSeed(str){
+    var h = 2166136261, i;
+    for(i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function inRange(pair, rand){ return Math.round(pair[0] + rand() * (pair[1] - pair[0])); }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function wrapNums(safeHtml){ return safeHtml.replace(/(\d+(?:\.\d+)?)\s*(%|pp)/g, "<span class='dc-num'>$1$2</span>"); }
+
+  function classify(text){
+    var t = text.toLowerCase(), best = "generic", bestHits = 0, d, hits, k;
+    for(d in DOMAINS){
+      if(d === "generic") continue;
+      hits = 0;
+      for(k = 0; k < DOMAINS[d].keywords.length; k++){
+        if(t.indexOf(DOMAINS[d].keywords[k].toLowerCase()) !== -1) hits++;
+      }
+      if(hits > bestHits){ best = d; bestHits = hits; }
+    }
+    return { id: best, tpl: DOMAINS[best], hits: bestHits };
+  }
+
+  function simClassic(text){
+    var cls  = classify(text);
+    var tpl  = cls.tpl;
+    var rand = mulberry32(hashSeed(text.trim()));
+    var p1 = inRange(tpl.probs[0].range, rand);
+    var p2 = clamp(p1 - (5 + Math.round(rand() * 9)), tpl.probs[1].range[0], tpl.probs[1].range[1]);
+    var p3 = inRange(tpl.probs[2].range, rand);
+    var p4 = clamp(p3 + (9 + Math.round(rand() * 15)), tpl.probs[3].range[0], tpl.probs[3].range[1]);
+    var conf = 76 + Math.round(rand() * 16);
+    var kw   = cls.hits >= 4 ? 3 : 2;
+    var refs = 8 + Math.round(rand() * 8);
+    var doA  = clamp(p4 + 6 + Math.round(rand() * 16), 40, 88);
+    var doB  = clamp(doA - (8 + Math.round(rand() * 18)), 12, 70);
+    var cfE  = clamp(p4 + 8 + Math.round(rand() * 18), 45, 90);
+    var cfShare = 35 + Math.round(rand() * 40);
+    var dd = { a: doA, b: doB, c: clamp(p1 + 4 + Math.round(rand() * 12), 55, 92), e: cfE, base: p3, cfShare: cfShare };
+    return {
+      source: "sim", model: "", refused: false,
+      badge: tpl.badge, evidence: text.trim(),
+      probs: [
+        { label: tpl.probs[0].label, value: p1, note: "" },
+        { label: tpl.probs[1].label, value: p2, note: "" },
+        { label: tpl.probs[2].label, value: p3, note: "" },
+        { label: tpl.probs[3].label, value: p4, note: "" }
+      ],
+      conf: conf, confReason: "", kw: kw, refs: refs,
+      u: tpl.u, v: tpl.v, f: tpl.f,
+      doTxt: tpl.doTxt(dd), cfTxt: tpl.cfTxt(dd),
+      layers: DEFAULT_LAYERS
+    };
+  }
+
+  function normClassic(d, input, model){
+    d = d || {};
+    function ci(v, lo, hi, dv){ v = Math.round(Number(v)); return isFinite(v) ? clamp(v, lo, hi) : dv; }
+    function str(v, dv, max){ v = String(v == null ? dv : v).trim(); return v ? v.slice(0, max) : dv; }
+    function arr(v, dv, max){
+      if(!Array.isArray(v) || !v.length) return dv;
+      return v.slice(0, max).map(function(x){ return String(x).trim(); }).filter(Boolean);
+    }
+    var probs = (Array.isArray(d.probs) ? d.probs : []).slice(0, 6).map(function(p, i){
+      p = p || {};
+      return { label: str(p.label, "概率推断 " + (i + 1), 80), value: ci(p.value, 1, 99, 50), note: String(p.note || "").trim().slice(0, 60) };
+    });
+    while(probs.length && probs.length < 4) probs.push({ label: "概率推断 " + (probs.length + 1), value: 50, note: "" });
+    if(!probs.length) probs = [{label:"概率推断 1",value:50,note:""},{label:"概率推断 2",value:50,note:""},{label:"概率推断 3",value:50,note:""},{label:"概率推断 4",value:50,note:""}];
+    return {
+      source: "api", model: model || "", refused: false,
+      badge: str(d.domain_badge, "通用情境", 12),
+      evidence: str(d.evidence, input.trim(), 4000),
+      probs: probs,
+      conf: ci(d.confidence, 50, 99, 80),
+      confReason: String(d.confidence_reason || "").trim().slice(0, 80),
+      kw: ci(d.keywords, 1, 5, 2), refs: ci(d.refs, 1, 99, 12),
+      u: arr(d.u, ["u₁ 环境背景噪声","u₂ 未观测的前提假设","u₃ 随机扰动项 ε"], 6),
+      v: arr(d.v, ["v₁ 观测信号","v₂ 中介判断","v₃ 行动决策","v₄ 结果变量"], 7),
+      f: arr(d.f, ["v₁ ← f₁(u₁, u₃)","v₂ ← f₂(v₁, u₂)","v₃ ← f₃(v₂, u₁)（决策节点）","v₄ ← f₄(v₃, u₂)（结果节点）"], 7),
+      doTxt: str(d.do_txt, "P(结果改善 | do(改变可控行动)) 显著高于观测基线（LLM 未返回明细）。", 400),
+      cfTxt: str(d.cf_txt, "反事实：若关键前提为真，结论概率显著上升（LLM 未返回明细）。", 400),
+      layers: {
+        math: str(d.math_layer, DEFAULT_LAYERS.math, 500),
+        compute: str(d.compute_layer, DEFAULT_LAYERS.compute, 500),
+        epis: str(d.epistemi_layer, DEFAULT_LAYERS.epis, 500)
+      }
+    };
+  }
+
+  function treeHTML(u, v, f){
+    var L = [];
+    L.push("<span class='t-hi'>M = ⟨U, V, F⟩</span>");
+    L.push("├── 外生变量 U（模型外部给定 · 不可观测）");
+    u.forEach(function(s){ L.push("│   ├── " + esc(s)); });
+    L.push("├── 内生变量 V（观测证据 · 模型内部决定）");
+    v.forEach(function(s){ L.push("│   ├── " + esc(s)); });
+    L.push("└── 结构函数 F（因果机制）");
+    f.forEach(function(s, i){ L.push("    " + (i === f.length - 1 ? "└── " : "├── ") + esc(s)); });
+    return L.join("\n");
+  }
+
+  function renderClassic(r){
+    $("result").hidden = true;
+    $("c-src").textContent = r.source === "api" ? ("LLM 编译 · " + (r.model || "API")) : "本地推演";
+    $("c-degrade").hidden = false;
+    $("c-kw").textContent = r.kw;
+    $("c-ref").textContent = r.refs;
+    $("c-domain").textContent = r.badge;
+    $("c-ev").textContent = r.evidence;
+    $("c-warn").hidden = !r.warn;
+    if(r.warn) $("c-warn").innerHTML = r.warn;
+
+    renderProbsClassic(r.probs);
+
+    $("c-pnote").innerHTML = r.source === "api"
+      ? "由 LLM 编译器生成：标签与数值针对本条观测证据定制，推演框架为贝叶斯后验 <code>P(H|E) = P(E|H)·P(H) / [P(E|H)·P(H) + P(E|¬H)·P(¬H)]</code>，经 SCM 运行时（结构方程 + do 算子）校验。"
+      : "推演方法：贝叶斯后验 <code>P(H|E) = P(E|H)·P(H) / [P(E|H)·P(H) + P(E|¬H)·P(¬H)]</code>，参数由输入文本哈希种子确定（同一输入结果稳定，演示数据）。";
+
+    $("c-conf-num").textContent = r.conf + "%";
+    $("c-conf-fill").style.width = "0%";
+    $("c-conf-badge").textContent = r.conf >= 85 ? "高" : r.conf >= 78 ? "较高" : "中";
+    if(r.confReason){
+      $("c-conf-reason").hidden = false;
+      $("c-conf-reason").innerHTML = "<b>为何是这个置信度：</b>" + esc(r.confReason);
+    } else {
+      $("c-conf-reason").hidden = true;
+    }
+
+    $("c-tree").innerHTML = treeHTML(r.u, r.v, r.f);
+    $("c-do").innerHTML = wrapNums(esc(r.doTxt));
+    $("c-cf").innerHTML = wrapNums(esc(r.cfTxt));
+
+    $("c-math").innerHTML = "<b>SCM 三元组 M = ⟨U, V, F⟩。</b>" + esc(r.layers.math);
+    $("c-compute").innerHTML = "<b>LLM 角色为编译器，SCM 为运行时。</b>" + esc(r.layers.compute);
+    $("c-epis").innerHTML = "<b>知识在于干预不变性，而非文本相似性。</b>" + esc(r.layers.epis);
+    $("c-foot").textContent = r.source === "api"
+      ? ("本报告由 " + (r.model || "LLM") + " 作为编译器生成，SCM 结构（U/V/F、do 算子、反事实）为运行时校验框架。")
+      : "本页为前端演示：数值由模拟贝叶斯推演生成，仅保证方法论与输出结构的正确性。";
+
+    $("c-llm-toggle").setAttribute("aria-expanded", "false");
+    $("c-llm-body").classList.remove("open");
+
+    setTimeout(function(){ $("c-conf-fill").style.width = r.conf + "%"; }, 80);
+    $("result-classic").hidden = false;
+    lastText = plainReportClassic(r);
+    $("result-classic").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderProbsClassic(probs){
+    var box = $("c-probs");
+    box.innerHTML = "";
+    probs.forEach(function(p, i){
+      var row = el("div", "prob-row");
+      var fill = el("div", "prob-fill"); fill.style.width = "0%";
+      var lab = el("span", "p-label");
+      lab.appendChild(el("span", "p-idx", (i + 1) + "."));
+      var texts = el("span", "p-texts");
+      texts.appendChild(el("span", "", esc(p.label)));
+      if(p.note) texts.appendChild(el("span", "p-note", esc(p.note)));
+      lab.appendChild(texts);
+      row.appendChild(fill); row.appendChild(lab);
+      row.appendChild(el("span", "p-val", p.value + "%"));
+      box.appendChild(row);
+      setTimeout(function(){ fill.style.width = p.value + "%"; }, 60 + i * 90);
+    });
+  }
+
+  function plainReportClassic(r){
+    var L = [];
+    L.push("[搜索 " + r.kw + " 个关键词，参考 " + r.refs + " 篇资料 >]");
+    L.push("");
+    L.push("## SCLM (Structural Causal Logic Model) 输出 (观测推理)");
+    L.push("");
+    L.push("观测证据：" + r.evidence);
+    L.push("");
+    L.push("后验概率推断：");
+    r.probs.forEach(function(p, i){ L.push((i + 1) + ". " + p.label + "：" + p.value + "%" + (p.note ? "（" + p.note + "）" : "")); });
+    L.push("置信度：" + r.conf + "%" + (r.confReason ? "（" + r.confReason + "）" : ""));
+    L.push("");
+    L.push("[下方触发 LLM 深度解释模块]");
+    L.push("底层逻辑定义：");
+    L.push("- 数学层：" + r.layers.math);
+    L.push("- 计算层：" + r.layers.compute);
+    L.push("- 认知论：" + r.layers.epis);
+    return L.join("\n");
+  }
+
+  function simFlowClassic(text){
+    var box = $("compile"), steps = document.querySelectorAll("#sim-steps-classic .compile-step");
+    box.hidden = false;
+    $("api-step").classList.remove("show");
+    $("sim-steps").hidden = true;
+    $("sim-steps-classic").hidden = false;
+    Array.prototype.forEach.call(steps, function(s){ s.classList.remove("active", "done"); s.querySelector(".dot").innerHTML = ""; });
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+
+    var next = function(i){
+      if(i > 0){
+        steps[i-1].classList.remove("active");
+        steps[i-1].classList.add("done");
+        steps[i-1].querySelector(".dot").textContent = "✓";
+      }
+      if(i < steps.length){
+        steps[i].classList.add("active");
+        setTimeout(function(){ next(i + 1); }, 320);
+      } else {
+        setTimeout(function(){
+          box.hidden = true;
+          var r = simClassic(text);
+          r.warn = "当前为<b>本地演示推演</b>：仅保证输出结构与方法论演示，不代表真实 LLM 编译质量。配置 API 后由真实编译器生成。";
+          renderClassic(r);
+        }, 220);
+      }
+    };
+    next(0);
+  }
+
+  async function apiFlowClassic(text){
+    var box = $("compile");
+    box.hidden = false;
+    $("sim-steps").hidden = true;
+    $("sim-steps-classic").hidden = true;
+    var step = $("api-step");
+    step.classList.add("show");
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+
+    var s = loadSettings();
+    $("api-model").textContent = s.model || "默认模型";
+    var t0 = Date.now();
+    var timer = setInterval(function(){ $("api-elapsed").textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s"; }, 100);
+
+    var btn = $("run-btn");
+    btn.disabled = true;
+    btn.textContent = "LLM 编译中…";
+    try{
+      var r = await fetch("/api/infer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, baseUrl: s.baseUrl, apiKey: s.apiKey, model: s.model, format: "classic" })
+      });
+      var j = await r.json();
+      if(!r.ok || !j.ok) throw new Error(j && j.message ? j.message : ("HTTP " + r.status));
+      if(j.refused) throw new Error(j.message || "编译器按协议拒绝");
+      clearInterval(timer);
+      box.hidden = true;
+      renderClassic(normClassic(j.data, text, j.model));
+    }catch(e){
+      clearInterval(timer);
+      box.hidden = true;
+      var sim = simClassic(text);
+      sim.warn = "⚠ <b>LLM 调用失败，已回退本地演示推演。</b><br>原因：<code>" + esc(String(e.message || e)).slice(0, 300) + "</code><br>请检查 ⚙ API 设置或 server.js 是否在运行。";
+      renderClassic(sim);
+    } finally {
+      btn.disabled = false;
+      applyFormatUI();
+    }
+  }
+
+  $("c-llm-toggle").addEventListener("click", function(){
+    var open = this.getAttribute("aria-expanded") === "true";
+    this.setAttribute("aria-expanded", open ? "false" : "true");
+    $("c-llm-body").classList.toggle("open", !open);
+  });
+
+  /* ================= 计算引擎版：渲染与流程 ================= */
+
+  function fmtPct(v){ return v == null ? "—" : (Math.round(v * 1000) / 10) + "%"; }
+  function fmtNum(v){ return v == null ? "—" : String(v); }
+
+  function renderEngine(j){
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+    $("result-engine").hidden = false;
+    var eng = j.engine;
+
+    $("e-src").textContent = j.demo ? "内置演示模型（真实运行时）" : ("LLM 编译 · " + (j.model || "API"));
+    $("e-context").textContent = eng.context || "—";
+    $("e-warn").hidden = !j.warn;
+    if(j.warn) $("e-warn").innerHTML = j.warn;
+    $("e-refusal").hidden = !j.refused;
+    if(j.refused){
+      $("e-refusal").innerHTML = "<b>⛔ 编译失败（Final Rule）：</b>" + esc(j.message || "");
+      $("e-models").innerHTML = "";
+      $("e-cross-detail").textContent = "—";
+      $("e-grade").textContent = "C";
+      lastText = plainTextEngine(j);
+      return;
+    }
+
+    var cross = eng.cross, verdict = eng.verdict, narr = eng.narration || {};
+    var narrBy = {};
+    (narr.models || []).forEach(m => { narrBy[m.model_id] = m.reading; });
+
+    var box = $("e-models");
+    box.innerHTML = "";
+    eng.models.forEach(function(r){
+      if(r.errors){ box.appendChild(el("div", "risk-item", "<span class='sev-chip lethal'>失败</span><div class='risk-body'>" + esc(r.errors.join("；")) + "</div>")); return; }
+      var card = el("div", "dag-card");
+      card.style.marginBottom = "12px";
+
+      var head = el("div", "dag-head");
+      head.appendChild(el("span", "dag-id", esc(r.model_id) + " · " + esc(r.title)));
+      head.appendChild(el("span", "badge " + (r.identification.identified ? "" : "red"), r.identification.identified ? "后门全部阻断 · 可识别" : "存在未阻断后门 · 不可识别"));
+      card.appendChild(el("div", "dag-line", "后门识别：调整集 <b>" + ((r.identification.adjustment_set || []).map(id => (r.labels && r.labels[id]) || id).join(" / ") || "∅（无需调整或不可识别）") + "</b> · 后门路径 " + r.identification.backdoor_total + " 条" + (r.identification.unobserved_confounder ? " · <span class='rt-chip bad'>含不可观测混杂</span>" : "")));
+      card.appendChild(head);
+
+      card.appendChild(el("div", "eng-sec", "因果效应（do 干预蒙特卡洛，每臂 " + r.n_per_arm + " 智能体）"));
+      var ate = el("div", "eng-ate");
+      ate.appendChild(el("span", "big", (r.ate.value > 0 ? "+" : "") + r.ate.value));
+      ate.appendChild(el("span", "ci", "95% CI [" + r.ate.ci[0] + ", " + r.ate.ci[1] + "] · do(" + esc(r.exposure) + "=1) 时 " + esc(r.outcome) + "=" + fmtPct(r.ate.y_treated) + "，do(=0) 时 " + fmtPct(r.ate.y_control)));
+      card.appendChild(ate);
+
+      /* 三种估计对比条 */
+      var maxAbs = Math.max(Math.abs(r.ate.value), Math.abs(r.observational.contrast || 0), Math.abs(r.adjustment_estimate.value || 0), 0.01);
+      card.appendChild(el("div", "eng-sec", "相关 ≠ 因果：三种估计对比"));
+      [["do 干预（因果）", r.ate.value, "var(--blue)"],
+       ["观测天真对比（相关）", r.observational.contrast, "#9ca3af"],
+       ["后门调整估计", r.adjustment_estimate.value, "var(--green)"]].forEach(function(t){
+        var row = el("div", "bar-row");
+        row.appendChild(el("span", "bar-label", t[0]));
+        var track = el("div", "bar-track");
+        var core = el("div", "bar-core");
+        if(t[1] == null){ core.style.display = "none"; }
+        else {
+          var w = Math.abs(t[1]) / maxAbs * 50;
+          core.style.left = t[1] >= 0 ? "50%" : (50 - w) + "%";
+          core.style.width = w + "%";
+          core.style.background = t[2];
+        }
+        track.appendChild(core);
+        row.appendChild(track);
+        row.appendChild(el("span", "bar-val", fmtNum(t[1])));
+        card.appendChild(row);
+      });
+      card.appendChild(el("div", "dag-line", "混杂偏差（|观测对比 − 因果效应|）= <b>" + fmtNum(r.observational.bias) + "</b>" + (r.adjustment_estimate.value != null ? " · 调整估计 <b>" + r.adjustment_estimate.value + "</b>（" + esc(r.adjustment_estimate.note || "") + "，分层 " + (r.adjustment_estimate.strata || 0) + " 层）" : "")));
+
+      /* 反驳检验 */
+      var rc = el("div", "ref-chips");
+      Object.keys(r.refuters).forEach(function(k){
+        var rf = r.refuters[k];
+        var names = { placebo: "安慰剂检验", subset: "半样本稳定", noise: "加噪稳健" };
+        rc.appendChild(el("span", "ref-chip " + (rf.pass ? "pass" : "fail"), names[k] + " " + (rf.pass ? "✓" : "✗") + "（" + rf.value + "）"));
+      });
+      card.appendChild(rc);
+
+      /* 沙盘 */
+      card.appendChild(el("div", "eng-sec", "沙盘推演 · 多智能体原型"));
+      var tbl = el("table", "arch-table");
+      tbl.innerHTML = "<tr><th>智能体原型</th><th>数量</th><th>暴露偏移</th><th>do(=1) 时结果</th><th>do(=0) 时结果</th><th>原型 ATE</th></tr>" +
+        r.sandbox.map(a => "<tr><td>" + esc(a.label) + "</td><td>" + a.n + "</td><td>" + (a.exposure_shift > 0 ? "+" : "") + a.exposure_shift + "</td><td>" + fmtPct(a.y_treated) + "</td><td>" + fmtPct(a.y_control) + "</td><td><b>" + (a.ate > 0 ? "+" : "") + a.ate + "</b></td></tr>").join("");
+      card.appendChild(tbl);
+
+      if(r.hist){
+        card.appendChild(el("div", "eng-sec", "结果分布（蓝=do(=1)，浅=do(=0)）"));
+        var h1 = el("div", "hist-row treated");
+        var h0 = el("div", "hist-row");
+        r.hist.treated.forEach(v => { var b = el("div", "hbar"); b.style.height = Math.max(2, v * 300) + "px"; h1.appendChild(b); });
+        r.hist.control.forEach(v => { var b = el("div", "hbar"); b.style.height = Math.max(2, v * 300) + "px"; b.style.background = "var(--blue-line)"; h0.appendChild(b); });
+        var hw = el("div", "hist");
+        hw.appendChild(h1); hw.appendChild(h0);
+        hw.appendChild(el("div", "hist-label", "<span>" + r.hist.lo + "</span><span>结果取值 →</span><span>" + r3e(r.hist.lo + r.hist.w * r.hist.bins) + "</span>"));
+        card.appendChild(hw);
+      }
+
+      var reading = narrBy[r.model_id];
+      if(reading) card.appendChild(el("div", "eng-read", "<b>转述（数字已核验）：</b>" + esc(reading)));
+
+      box.appendChild(card);
+    });
+
+    $("e-cross").hidden = false;
+    $("e-cross").className = "badge " + (cross.converged ? "green" : "amber");
+    $("e-cross").textContent = cross.converged ? "跨模型收敛" : "跨模型分歧";
+    $("e-cross-detail").innerHTML = "各模型 ATE：" + esc((cross.ate_values || []).map(v => (v > 0 ? "+" : "") + v).join("、")) +
+      " · 极差 <b>" + fmtNum(cross.spread) + "</b> · 同号 " + (cross.same_sign ? "是" : "否") + " · " + (cross.converged ? "结构假设收敛，效应稳健" : "结构假设存在分歧，以下方定级为准");
+
+    $("e-grade").textContent = verdict.grade;
+    $("e-grade").className = "grade-badge " + verdict.grade;
+    $("e-grade-reason").textContent = verdict.reason;
+    $("e-grade-basis").textContent = verdict.basis;
+    $("e-overall").innerHTML = "<b>总转述：</b>" + esc(narr.overall || "—");
+    $("e-uncertain").innerHTML = "<b>不确定性声明：</b>" + esc(narr.uncertainty || "全部数值来自蒙特卡洛模拟，无实证数据拟合。") + (narr.fallback_note ? "<br>⚠ " + esc(narr.fallback_note) : "");
+
+    var rb = $("e-rounds");
+    rb.innerHTML = "";
+    (j.rounds || []).forEach(function(rd){
+      var item = el("div", "round-item");
+      item.appendChild(el("span", "r-no", "第 " + rd.round + " 轮"));
+      var body = el("div", "");
+      body.appendChild(el("div", "r-trigger", esc(rd.trigger)));
+      body.appendChild(el("div", "r-note", esc(rd.note || "")));
+      item.appendChild(body);
+      rb.appendChild(item);
+    });
+
+    lastText = plainTextEngine(j);
+    $("result-engine").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function r3e(v){ return Math.round(v * 1000) / 1000; }
+
+  function plainTextEngine(j){
+    var L = [], eng = j.engine;
+    L.push("## 因果计算引擎报告（编译器 + 计算器 + 沙盘）");
+    L.push("[降级态：全部数值来自蒙特卡洛 SCM 模拟，无实证数据拟合，标注为非因果假设]");
+    L.push("场景：" + (eng.context || "—") + (j.demo ? "（内置演示模型）" : "（LLM 编译 · " + j.model + "）"));
+    (eng.models || []).forEach(function(r){
+      if(r.errors){ L.push(r.model_id + "：编译失败"); return; }
+      L.push("");
+      L.push(r.model_id + " · " + r.title);
+      L.push("- 识别：" + (r.identification.identified ? "可识别" : "不可识别") + "，后门 " + r.identification.backdoor_total + " 条，调整集 " + (r.identification.adjustment_set || []).join("/") || "无");
+      L.push("- 因果效应 ATE = " + r.ate.value + "（95% CI [" + r.ate.ci[0] + ", " + r.ate.ci[1] + "]）；do(=1) 结果 " + r.ate.y_treated + "，do(=0) 结果 " + r.ate.y_control);
+      L.push("- 观测天真对比：" + r.observational.contrast + "（混杂偏差 " + r.observational.bias + "）；后门调整估计：" + r.adjustment_estimate.value);
+      L.push("- 反驳检验：" + Object.keys(r.refuters).map(k => k + " " + r.refuters[k].value + (r.refuters[k].pass ? " ✓" : " ✗")).join("；"));
+      L.push("- 沙盘：" + r.sandbox.map(a => a.label + "(n=" + a.n + ", ATE " + a.ate + ")").join("；"));
+    });
+    L.push("");
+    L.push("跨模型：ATE " + (eng.cross.ate_values || []).join("、") + "，极差 " + eng.cross.spread + (eng.cross.converged ? "（收敛）" : "（分歧）"));
+    L.push("结论可信度：" + eng.verdict.grade + " —— " + eng.verdict.reason);
+    L.push(eng.verdict.basis);
+    if(eng.narration && eng.narration.overall) L.push("总转述：" + eng.narration.overall);
+    if(eng.narration && eng.narration.uncertainty) L.push("不确定性：" + eng.narration.uncertainty);
+    return L.join("\n");
+  }
+
+  async function apiFlowEngine(text){
+    var box = $("compile");
+    box.hidden = false;
+    $("sim-steps").hidden = true;
+    $("sim-steps-classic").hidden = true;
+    var s = loadSettings();
+    var useApi = !!s.apiKey;
+    $("sim-steps-engine").hidden = useApi;
+    var step = $("api-step");
+    if(useApi){
+      step.classList.add("show");
+      $("api-step-text").innerHTML = "引擎流水线 · <b id='api-model'>" + esc(s.model || "默认模型") + "</b> —— LLM 编译 → 运行时校验 → 蒙特卡洛计算 → 沙盘推演 → 转述核验";
+    } else {
+      step.classList.remove("show");
+    }
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+    $("result-engine").hidden = true;
+
+    var t0 = Date.now();
+    var timer = setInterval(function(){ $("api-elapsed").textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s"; }, 100);
+    var btn = $("run-btn");
+    btn.disabled = true;
+    btn.textContent = "引擎计算中…";
+    try{
+      var r = await fetch("/api/infer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, baseUrl: s.baseUrl, apiKey: s.apiKey, model: s.model, format: "engine" })
+      });
+      var j = await r.json();
+      if(!r.ok || !j.ok) throw new Error(j && j.message ? j.message : ("HTTP " + r.status));
+      clearInterval(timer);
+      box.hidden = true;
+      renderEngine(j);
+    }catch(e){
+      clearInterval(timer);
+      box.hidden = true;
+      var sim = simClassic(text);
+      sim.warn = "⚠ <b>引擎计算失败，已回退本地演示推演。</b><br>原因：<code>" + esc(String(e.message || e)).slice(0, 300) + "</code><br>请检查 ⚙ API 设置或 server.js 是否在运行。";
+      renderClassic(sim);
+    } finally {
+      btn.disabled = false;
+      applyFormatUI();
+    }
+  }
+
+  /* ================= 设置 ================= */
+
+  var LS = { base: "sclm_base", key: "sclm_key", model: "sclm_model" };
+  function loadSettings(){
+    try{
+      return { baseUrl: localStorage.getItem(LS.base) || "", apiKey: localStorage.getItem(LS.key) || "", model: localStorage.getItem(LS.model) || "" };
+    }catch(e){ return { baseUrl:"", apiKey:"", model:"" }; }
+  }
+  function updateModePill(){
+    var s = loadSettings(), pill = $("mode-pill");
+    if(s.apiKey){
+      pill.className = "mode-pill api";
+      pill.innerHTML = '<span class="dot"></span>API · ' + esc(s.model || "已配置");
+    } else {
+      pill.className = "mode-pill";
+      pill.innerHTML = '<span class="dot"></span>本地演示模式';
+    }
+  }
+
+  $("api-settings-btn").addEventListener("click", function(){
+    var p = $("settings");
+    p.hidden = !p.hidden;
+    if(!p.hidden){
+      var s = loadSettings();
+      $("s-base").value = s.baseUrl || $("s-base").value;
+      $("s-model").value = s.model || $("s-model").value;
+      $("s-key").value = s.apiKey || "";
+      if(location.protocol === "file:"){
+        $("s-file-warn").textContent = "⚠ 当前是 file:// 直开模式，API 转发不可用——请用「node server.js」（或 start.bat）启动后访问。";
+      }
+    }
+  });
+
+  var PROVIDER_PRESETS = {
+    zhipu:    { baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.6",        keyTip: "Key 形如 id.secret" },
+    deepseek: { baseUrl: "https://api.deepseek.com",             model: "deepseek-chat",  keyTip: "Key 形如 sk-…" },
+    moonshot: { baseUrl: "https://api.moonshot.cn/v1",           model: "moonshot-v1-128k", keyTip: "Key 形如 sk-…" },
+    openai:   { baseUrl: "https://api.openai.com/v1",            model: "gpt-4o",         keyTip: "Key 形如 sk-…" }
+  };
+  Array.prototype.forEach.call(document.querySelectorAll(".chip[data-preset]"), function(chip){
+    chip.addEventListener("click", function(){
+      var p = PROVIDER_PRESETS[chip.getAttribute("data-preset")];
+      if(!p) return;
+      $("s-base").value = p.baseUrl;
+      $("s-model").value = p.model;
+      $("s-msg").className = "settings-msg";
+      $("s-msg").textContent = "已填入 " + chip.textContent + "（" + p.keyTip + "），填 Key 后点「测试连接」。";
+      $("s-key").focus();
+    });
+  });
+
+  $("s-save").addEventListener("click", function(){
+    var base = $("s-base").value.trim(), model = $("s-model").value.trim(), key = $("s-key").value.trim();
+    try{
+      if(key){ localStorage.setItem(LS.base, base); localStorage.setItem(LS.model, model); localStorage.setItem(LS.key, key); }
+      else { localStorage.removeItem(LS.key); localStorage.removeItem(LS.base); localStorage.removeItem(LS.model); }
+    }catch(e){}
+    updateModePill();
+    var msg = $("s-msg");
+    msg.className = "settings-msg";
+    msg.textContent = key ? "已保存。运行推演将调用 " + (model || "默认模型") + "。" : "已清空 Key，回退本地演示模式。";
+  });
+
+  $("s-test").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true;
+    var msg = $("s-msg");
+    msg.className = "settings-msg"; msg.textContent = "连接中…";
+    try{
+      var r = await fetch("/api/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: $("s-base").value.trim(), model: $("s-model").value.trim(), apiKey: $("s-key").value.trim() })
+      });
+      var j = await r.json();
+      msg.className = "settings-msg" + (j.ok ? "" : " err");
+      msg.textContent = j.message || (j.ok ? "连接正常" : "连接失败");
+    }catch(e){
+      msg.className = "settings-msg err";
+      msg.textContent = "请求失败：" + e.message;
+    }
+    btn.disabled = false;
+  });
+
+  /* ================= 运行流程 ================= */
+
+  var input = $("obs-input");
+
+  function simFlow(text){
+    var box = $("compile"), steps = document.querySelectorAll("#sim-steps .compile-step");
+    box.hidden = false;
+    $("api-step").classList.remove("show");
+    $("sim-steps").hidden = false;
+    $("sim-steps-classic").hidden = true;
+    Array.prototype.forEach.call(steps, function(s){ s.classList.remove("active", "done"); s.querySelector(".dot").innerHTML = ""; });
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+    var next = function(i){
+      if(i > 0){
+        steps[i-1].classList.remove("active");
+        steps[i-1].classList.add("done");
+        steps[i-1].querySelector(".dot").textContent = "✓";
+      }
+      if(i < steps.length){
+        steps[i].classList.add("active");
+        setTimeout(function(){ next(i + 1); }, 320);
+      } else {
+        setTimeout(function(){
+          box.hidden = true;
+          var r = simRecord(text);
+          r.warn = "当前为<b>本地演示推演</b>：仅保证协议结构与运行时逻辑演示，不代表真实 LLM 编译质量。配置 API 后由真实编译器生成。";
+          render(r);
+        }, 220);
+      }
+    };
+    next(0);
+  }
+
+  async function apiFlow(text){
+    var box = $("compile");
+    box.hidden = false;
+    $("sim-steps").hidden = true;
+    $("sim-steps-classic").hidden = true;
+    var step = $("api-step");
+    step.classList.add("show");
+    $("result").hidden = true;
+    $("result-classic").hidden = true;
+
+    var s = loadSettings();
+    $("api-model").textContent = s.model || "默认模型";
+    var t0 = Date.now();
+    var timer = setInterval(function(){
+      $("api-elapsed").textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
+    }, 100);
+
+    var btn = $("run-btn");
+    btn.disabled = true;
+    btn.textContent = "协议编排中…";
+
+    try{
+      var r = await fetch("/api/infer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, baseUrl: s.baseUrl, apiKey: s.apiKey, model: s.model })
+      });
+      var j = await r.json();
+      if(!r.ok || !j.ok) throw new Error(j && j.message ? j.message : ("HTTP " + r.status));
+      clearInterval(timer);
+      box.hidden = true;
+      render(j);
+    }catch(e){
+      clearInterval(timer);
+      box.hidden = true;
+      var sim = simRecord(text);
+      sim.warn = "⚠ <b>LLM 调用失败，已回退本地演示推演。</b><br>原因：<code>" + esc(String(e.message || e)).slice(0, 300) + "</code><br>请检查 ⚙ API 设置或 server.js 是否在运行。";
+      render(sim);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "运行 SCLM 协议推演";
+    }
+  }
+
+  $("run-btn").addEventListener("click", function(){
+    var t = input.value.trim();
+    if(!t){
+      $("input-error").classList.add("show");
+      input.focus();
+      return;
+    }
+    $("input-error").classList.remove("show");
+    var s = loadSettings();
+    var fmt = getFormat();
+    if(fmt === "engine"){ apiFlowEngine(t); }
+    else if(fmt === "protocol"){ if(s.apiKey){ apiFlow(t); } else { simFlow(t); } }
+    else { if(s.apiKey){ apiFlowClassic(t); } else { simFlowClassic(t); } }
+  });
+  input.addEventListener("input", function(){ $("input-error").classList.remove("show"); });
+  input.addEventListener("keydown", function(e){
+    if((e.ctrlKey || e.metaKey) && e.key === "Enter") $("run-btn").click();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".copy-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      if(lastText == null){ showToast("请先运行一次推演，再复制记录"); return; }
+      var text = lastText;
+      var done = function(){ showToast("已复制到剪贴板"); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+  });
+
+  function showToast(msg){
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function(){ t.classList.remove("show"); }, 1600);
+  }
+  function fallbackCopy(text, done){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+    done();
+  }
+
+  updateModePill();
+  applyFormatUI();
+})();
+</script>
+</body>
+</html>
